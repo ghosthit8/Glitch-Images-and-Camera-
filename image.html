@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Image Glitch</title>
+  <style>
+    :root{--bg:#050608;--fg:#d9ffe2;--neon:#39ff88;--muted:#7ccf9a;--border:#1b2a22}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui}
+    header{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;justify-content:space-between}
+    header b{color:var(--neon);letter-spacing:.6px}
+    main{max-width:1100px;margin:0 auto;padding:12px;display:grid;gap:12px}
+    .panel{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#070b0c}
+    .wrap{position:relative;width:100%;aspect-ratio:16/9;background:#000}
+    canvas{width:100%;height:100%;display:block}
+    .overlay{
+      pointer-events:none; position:absolute; inset:0;
+      background:
+        linear-gradient(to bottom, rgba(57,255,136,.08), transparent 30%),
+        repeating-linear-gradient(to bottom, rgba(255,255,255,.06) 0px, rgba(255,255,255,.06) 1px, transparent 2px, transparent 4px);
+      mix-blend-mode: overlay; opacity:.35;
+    }
+    .controls{padding:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+    button, label.btn{
+      border:1px solid var(--border);
+      background:#08110d;
+      color:var(--fg);
+      padding:10px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      user-select:none;
+    }
+    label.btn:hover, button:hover{border-color:rgba(57,255,136,.45)}
+    button.primary{border-color:rgba(57,255,136,.45);background:rgba(57,255,136,.12)}
+    button.danger{border-color:rgba(255,80,80,.35);background:rgba(255,80,80,.10)}
+    .slider{min-width:220px;display:flex;flex-direction:column;gap:6px}
+    .slider label{font-size:12px;color:var(--muted)}
+    input[type=range]{width:100%;accent-color:var(--neon)}
+    input[type=file]{display:none}
+    .note{padding:0 12px 12px;color:var(--muted);font-size:12px}
+    a{color:var(--neon)}
+  </style>
+</head>
+<body>
+<header>
+  <div><b>Image Glitch</b> <span style="color:#7ccf9a;font-size:12px">upload an image and glitch it</span></div>
+  <a href="./index.html" style="color:#39ff88;text-decoration:none">← back</a>
+</header>
+
+<main>
+  <section class="panel">
+    <div class="wrap">
+      <canvas id="c"></canvas>
+      <div class="overlay"></div>
+    </div>
+
+    <div class="controls">
+      <label class="btn primary">
+        📁 Load Image
+        <input id="file" type="file" accept="image/*" />
+      </label>
+
+      <button id="toggle" class="primary">⚡ Glitch: ON</button>
+      <button id="freeze">🧊 Freeze</button>
+      <button id="snap">💾 Save</button>
+      <button id="clear" class="danger">🧹 Clear</button>
+
+      <div class="slider">
+        <label>Intensity: <span id="ival">0.55</span></label>
+        <input id="intensity" type="range" min="0" max="1" step="0.01" value="0.55">
+      </div>
+
+      <div class="slider">
+        <label>FPS: <span id="fval">30</span></label>
+        <input id="fps" type="range" min="5" max="60" step="1" value="30">
+      </div>
+
+      <div class="slider">
+        <label>Randomness: <span id="rval">0.35</span></label>
+        <input id="rand" type="range" min="0" max="1" step="0.01" value="0.35">
+      </div>
+    </div>
+
+    <div class="note" id="note">
+      Pick an image. Everything happens locally in your browser — no uploads.
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+  const file = document.getElementById('file');
+  const toggleBtn = document.getElementById('toggle');
+  const freezeBtn = document.getElementById('freeze');
+  const snapBtn = document.getElementById('snap');
+  const clearBtn = document.getElementById('clear');
+
+  const intensity = document.getElementById('intensity');
+  const fps = document.getElementById('fps');
+  const rand = document.getElementById('rand');
+  const ival = document.getElementById('ival');
+  const fval = document.getElementById('fval');
+  const rval = document.getElementById('rval');
+  const note = document.getElementById('note');
+
+  let srcImage = null;
+  let glitchOn = true;
+  let frozen = false;
+
+  let lastFrame = 0;
+  let t = 0;
+
+  function fit(w, h){
+    const maxW = 1280;
+    const scale = Math.min(1, maxW / w);
+    canvas.width = Math.round(w * scale);
+    canvas.height = Math.round(h * scale);
+  }
+
+  function drawBase(){
+    if (!srcImage){
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle = "rgba(57,255,136,.85)";
+      ctx.font = "16px system-ui";
+      ctx.fillText("Load an image…", 18, 34);
+      return;
+    }
+    ctx.drawImage(srcImage, 0, 0, canvas.width, canvas.height);
+  }
+
+  function glitchPass(img, amt, chaos){
+    const { width:w, height:h, data } = img;
+
+    // scanlines + noise
+    const noiseAmt = (16 + chaos*18) * amt;
+    const scanAmt = 0.18 * amt;
+
+    for (let y=0; y<h; y++){
+      const scan = (y % 3 === 0) ? (1 - scanAmt) : 1;
+      for (let x=0; x<w; x++){
+        const i = (y*w + x)*4;
+        const n = (Math.random() - 0.5) * noiseAmt;
+        data[i]   = Math.max(0, Math.min(255, (data[i]   + n) * scan));
+        data[i+1] = Math.max(0, Math.min(255, (data[i+1] + n) * scan));
+        data[i+2] = Math.max(0, Math.min(255, (data[i+2] + n) * scan));
+      }
+    }
+
+    // horizontal slice shifts
+    const slices = Math.floor(6 + amt * (18 + chaos*18));
+    for (let s=0; s<slices; s++){
+      const y = Math.floor(Math.random() * h);
+      const sliceH = Math.max(1, Math.floor((Math.random() * 18 + 2) * amt));
+      const dx = Math.floor((Math.random() - 0.5) * w * (0.18 + chaos*0.22) * amt);
+
+      for (let yy=y; yy<Math.min(h, y+sliceH); yy++){
+        const rowStart = yy*w*4;
+        const row = data.slice(rowStart, rowStart + w*4);
+        for (let x=0; x<w; x++){
+          const srcX = (x - dx + w) % w;
+          const di = rowStart + x*4;
+          const si = srcX*4;
+          data[di]   = row[si];
+          data[di+1] = row[si+1];
+          data[di+2] = row[si+2];
+        }
+      }
+    }
+
+    // RGB split drift
+    const split = Math.floor(1 + amt * (8 + chaos*8));
+    const copy = data.slice();
+    const drift = Math.sin(t * (0.7 + chaos*2.2)) * 2 * amt;
+
+    const sample = (src, x, y, c) => {
+      x = (x + w) % w; y = (y + h) % h;
+      return src[(y*w + x)*4 + c];
+    };
+
+    for (let y=0; y<h; y++){
+      for (let x=0; x<w; x++){
+        const i = (y*w + x)*4;
+        data[i]   = sample(copy, x + split + drift, y, 0);
+        data[i+1] = sample(copy, x - split - drift, y, 1);
+        data[i+2] = sample(copy, x + split*2, y, 2);
+      }
+    }
+
+    // occasional bright blocks
+    const blocks = Math.floor(amt * (10 + chaos*14));
+    for (let b=0; b<blocks; b++){
+      if (Math.random() > amt) continue;
+      const bw = Math.floor(10 + Math.random()*60*amt);
+      const bh = Math.floor(6 + Math.random()*40*amt);
+      const bx = Math.floor(Math.random() * w);
+      const by = Math.floor(Math.random() * h);
+      const tint = 40 + Math.random()*120;
+
+      for (let y=by; y<Math.min(h, by+bh); y++){
+        for (let x=bx; x<Math.min(w, bx+bw); x++){
+          const i = (y*w + x)*4;
+          data[i]   = Math.min(255, data[i]   + tint);
+          data[i+1] = Math.max(0,   data[i+1] - tint*0.35);
+          data[i+2] = Math.min(255, data[i+2] + tint*0.2);
+        }
+      }
+    }
+
+    return img;
+  }
+
+  file.addEventListener('change', (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+
+    const img = new Image();
+    img.onload = () => {
+      srcImage = img;
+      fit(img.naturalWidth, img.naturalHeight);
+      note.textContent = `Loaded: ${f.name}`;
+    };
+    img.onerror = () => note.textContent = "Could not load that image.";
+    img.src = URL.createObjectURL(f);
+  });
+
+  toggleBtn.addEventListener('click', () => {
+    glitchOn = !glitchOn;
+    toggleBtn.textContent = glitchOn ? "⚡ Glitch: ON" : "⚡ Glitch: OFF";
+    toggleBtn.classList.toggle('primary', glitchOn);
+  });
+
+  freezeBtn.addEventListener('click', () => {
+    frozen = !frozen;
+    freezeBtn.textContent = frozen ? "▶ Unfreeze" : "🧊 Freeze";
+  });
+
+  snapBtn.addEventListener('click', () => {
+    const a = document.createElement('a');
+    a.download = `image_glitch_${Date.now()}.png`;
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  });
+
+  clearBtn.addEventListener('click', () => {
+    srcImage = null;
+    frozen = false;
+    note.textContent = "Cleared. Load an image.";
+    drawBase();
+  });
+
+  intensity.addEventListener('input', () => ival.textContent = Number(intensity.value).toFixed(2));
+  fps.addEventListener('input', () => fval.textContent = fps.value);
+  rand.addEventListener('input', () => rval.textContent = Number(rand.value).toFixed(2));
+
+  // init
+  canvas.width = 1280; canvas.height = 720;
+  drawBase();
+
+  function loop(now){
+    const target = 1000 / Number(fps.value);
+    if (!lastFrame) lastFrame = now;
+    const elapsed = now - lastFrame;
+
+    if (elapsed >= target){
+      lastFrame = now - (elapsed % target);
+
+      if (!frozen){
+        drawBase();
+        if (glitchOn && srcImage){
+          const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+          ctx.putImageData(glitchPass(img, Number(intensity.value), Number(rand.value)), 0, 0);
+          t += 0.016;
+        }
+      }
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
