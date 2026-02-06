@@ -1,29 +1,52 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Glitch Lab</title>
+  <title>Glitch Tools</title>
   <style>
-    body{margin:0;background:#060708;color:#d9ffe2;font-family:system-ui}
-    .wrap{max-width:720px;margin:0 auto;padding:24px}
-    h1{color:#39ff88;letter-spacing:.6px}
-    a{
-      display:block; margin:12px 0; padding:14px 16px;
-      border:1px solid #1b2a22; border-radius:14px;
-      background:#08110d; color:#d9ffe2; text-decoration:none;
+    :root{
+      --bg:#050608;--fg:#d9ffe2;--neon:#39ff88;--muted:#7ccf9a;--border:#1b2a22;
+      --card:#070a0d;
     }
-    a:hover{border-color:rgba(57,255,136,.45)}
-    small{color:#7ccf9a}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+    header{padding:14px 14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;justify-content:space-between}
+    header b{color:var(--neon);letter-spacing:.6px}
+    main{max-width:980px;margin:0 auto;padding:14px;display:grid;gap:12px}
+    .panel{border:1px solid var(--border);background:linear-gradient(180deg,#070a0d,#050608);border-radius:16px;padding:14px}
+    .row{display:flex;flex-wrap:wrap;gap:10px}
+    a.btn{
+      text-decoration:none;
+      display:inline-flex;align-items:center;gap:8px;
+      border:1px solid var(--border);
+      background:rgba(57,255,136,.06);
+      color:var(--fg);
+      padding:10px 12px;border-radius:12px;
+      transition:.15s transform,.15s background,.15s border-color;
+      user-select:none
+    }
+    a.btn:hover{transform:translateY(-1px);border-color:rgba(57,255,136,.35);background:rgba(57,255,136,.10)}
+    .hint{color:var(--muted);font-size:13px;line-height:1.4}
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>GLITCH LAB</h1>
-    <small>Everything runs locally in your browser. Camera only turns on after you allow it.</small>
+  <header>
+    <div><b>RAGE</b> • Glitch Tools</div>
+    <div class="hint">Static pages • GitHub Pages friendly</div>
+  </header>
 
-    <a href="./camera.html">📷 Live Camera Glitch</a>
-    <a href="./image.html">🖼️ Image Upload Glitch</a>
-  </div>
+  <main>
+    <section class="panel">
+      <div class="row">
+        <a class="btn" href="image.html">🧪 Image Glitcher</a>
+        <a class="btn" href="image2.html">🧩 Artifact Breaker (new)</a>
+        <a class="btn" href="camera.html">📷 Camera Glitch</a>
+      </div>
+      <p class="hint" style="margin:10px 0 0">
+        New mode: “Artifact Breaker” shatters the image into macroblocks and corrupts/warps blocks like busted compression.
+      </p>
+    </section>
+  </main>
 </body>
 </html>
